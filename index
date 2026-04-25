@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PTA LINE まとめツール</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, 'Hiragino Sans', sans-serif; background: #F5F3EE; color: #1A2730; min-height: 100vh; padding: 24px 16px 48px; }
+  header { text-align: center; margin-bottom: 24px; }
+  .logo { display: inline-flex; align-items: center; gap: 8px; background: #3D6B4F; color: white; padding: 10px 22px; border-radius: 32px; font-size: 15px; font-weight: 700; margin-bottom: 8px; }
+  .subtitle { color: #8A9BA8; font-size: 13px; }
+  .card { background: white; border-radius: 16px; padding: 20px; box-shadow: 0 2px 12px rgba(0,0,0,0.06); border: 1px solid #E0DDD6; max-width: 680px; margin: 0 auto 16px; }
+  .label { font-size: 13px; font-weight: 700; color: #8A9BA8; margin-bottom: 10px; }
+  input[type=password], input[type=text] { width: 100%; border: 1.5px solid #E0DDD6; border-radius: 10px; padding: 12px 14px; font-family: inherit; font-size: 14px; background: #F5F3EE; color: #1A2730; }
+  input:focus { outline: none; border-color: #3D6B4F; background: white; }
+  textarea { width: 100%; min-height: 200px; border: 1.5px solid #E0DDD6; border-radius: 10px; padding: 14px; font-family: inherit; font-size: 14px; line-height: 1.7; resize: vertical; background: #F5F3EE; color: #1A2730; }
+  textarea:focus { outline: none; border-color: #3D6B4F; background: white; }
+  .btn { width: 100%; margin-top: 12px; padding: 14px; border: none; border-radius: 10px; font-family: inherit; font-size: 15px; font-weight: 700; cursor: pointer; background: #3D6B4F; color: white; }
+  .btn:disabled { background: #8A9BA8; cursor: not-allowed; }
+  .btn-sm { padding: 10px; font-size: 13px; margin-top: 8px; background: #5A6B7A; }
+  .error { margin-top: 12px; background: #FDF0EA; border: 1px solid #F0C8A8; border-radius: 10px; padding: 12px 16px; color: #C4622D; font-size: 13px; word-break: break-all; }
+  .success-note { margin-top: 10px; background: #EBF3EE; border-radius: 10px; padding: 10px 14px; color: #3D6B4F; font-size: 13px; }
+  .loading { text-align: center; padding: 32px; color: #8A9BA8; font-size: 14px; max-width: 680px; margin: 0 auto; }
+  .spinner { width: 32px; height: 32px; border: 3px solid #E0DDD6; border-top-color: #3D6B4F; border-radius: 50%; animation: spin 0.8s linear infinite; margin: 0 auto 12px; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .results { max-width: 680px; margin: 0 auto; }
+  .section { background: white; border-radius: 16px; overflow: hidden; box-shadow: 0 2px 12px rgba(0,0,0,0.06); border: 1px solid #E0DDD6; margin-bottom: 14px; }
+  .section-header { display: flex; align-items: center; gap: 10px; padding: 14px 18px; font-weight: 700; font-size: 14px; }
+  .badge { margin-left: auto; background: white; border-radius: 20px; padding: 2px 10px; font-size: 12px; font-weight: 700; }
+  .item { display: flex; gap: 12px; padding: 12px 18px; border-top: 1px solid #E0DDD6; font-size: 14px; line-height: 1.6; }
+  .item-num { font-size: 11px; color: #8A9BA8; min-width: 22px; margin-top: 2px; }
+  .empty { padding: 14px 18px; color: #8A9BA8; font-size: 13px; text-align: center; }
+  .summary-body { padding: 14px 18px; font-size: 14px; line-height: 1.8; }
+  .reset-btn { width: 100%; padding: 12px; background: #EEF1F4; color: #5A6B7A; border: none; border-radius: 10px; font-family: inherit; font-size: 13px; font-weight: 700; cursor: pointer; margin-top: 4px; }
+  .hidden { display: none; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">📋 PTA LINE まとめツール</div>
+  <div class="subtitle">委員長からのLINEを貼り付けるだけで自動整理します</div>
+</header>
+
+<!-- APIキー入力 -->
+<div class="card" id="apiKeyCard">
+  <div class="label">🔑 APIキー（初回のみ）</div>
+  <input type="password" id="apiKeyInput" placeholder="sk-ant-..." />
+  <button class="btn btn-sm" onclick="saveKey()">保存する</button>
+  <div class="hidden success-note" id="keyNote">✅ 保存済み（次回から不要です）</div>
+</div>
+
+<!-- LINE入力 -->
+<div id="inputSection">
+  <div class="card">
+    <div class="label">💬 LINEのテキストをここに貼り付け</div>
+    <textarea id="lineText" placeholder="例：
+2025/04/20 09:12 委員長
+運動会の案内文っていつ配布になりますか？
+
+2025/04/20 09:15 委員長
+あと予算書の昨年度版も見たいんですが"></textarea>
+    <button class="btn" id="analyzeBtn" onclick="analyze()">✨ まとめる</button>
+    <div class="error hidden" id="errorBox"></div>
+  </div>
+</div>
+
+<div class="loading hidden" id="loadingBox">
+  <div class="spinner"></div>
+  LINEの内容を整理しています…
+</div>
+
+<div class="results hidden" id="resultsBox"></div>
+
+<script>
+const SECTIONS = [
+  { key: "urgent",    icon: "🚨", label: "急ぎ・要対応",   bg: "#FDF0EA", border: "#F0C8A8", color: "#C4622D" },
+  { key: "requests",  icon: "📌", label: "依頼事項",       bg: "#EBF3EE", border: "#B8D8C4", color: "#3D6B4F" },
+  { key: "questions", icon: "❓", label: "確認事項・質問", bg: "#EEF1F4", border: "#C8D4DC", color: "#5A6B7A" },
+  { key: "done",      icon: "✅", label: "完了・解決済み", bg: "#EAF1F9", border: "#B8D0E8", color: "#2D6A9F" },
+];
+
+// 起動時にlocalStorageからキーを読み込む
+window.onload = function() {
+  const saved = localStorage.getItem("pta_api_key");
+  if (saved) {
+    document.getElementById("apiKeyInput").value = saved;
+    document.getElementById("keyNote").classList.remove("hidden");
+  }
+};
+
+function saveKey() {
+  const key = document.getElementById("apiKeyInput").value.trim();
+  if (!key) return;
+  localStorage.setItem("pta_api_key", key);
+  document.getElementById("keyNote").classList.remove("hidden");
+}
+
+function getKey() {
+  return localStorage.getItem("pta_api_key") || document.getElementById("apiKeyInput").value.trim();
+}
+
+function extractJSON(raw) {
+  try { return JSON.parse(raw.trim()); } catch {}
+  const s = raw.indexOf("{"), e = raw.lastIndexOf("}");
+  if (s !== -1 && e > s) { try { return JSON.parse(raw.slice(s, e + 1)); } catch {} }
+  return null;
+}
+
+async function analyze() {
+  const text = document.getElementById("lineText").value.trim();
+  const apiKey = getKey();
+
+  if (!text) return;
+  if (!apiKey) { showError("APIキーを入力して「保存する」を押してください。"); return; }
+
+  document.getElementById("analyzeBtn").disabled = true;
+  document.getElementById("errorBox").classList.add("hidden");
+  document.getElementById("loadingBox").classList.remove("hidden");
+  document.getElementById("inputSection").classList.add("hidden");
+  document.getElementById("resultsBox").classList.add("hidden");
+
+  try {
+    const res = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-api-key": apiKey,
+        "anthropic-version": "2023-06-01",
+        "anthropic-dangerous-direct-browser-access": "true",
+      },
+      body: JSON.stringify({
+        model: "claude-haiku-4-5",
+        max_tokens: 1000,
+        system: 'JSONのみで返してください。形式: {"urgent":[],"requests":[],"questions":[],"done":[],"summary":""}',
+        messages: [{ role: "user", content: `以下のPTA LINEを分析してください:\n\n${text}` }],
+      }),
+    });
+
+    const data = await res.json();
+    if (!res.ok) throw new Error(data?.error?.message || `HTTP ${res.status}`);
+
+    const raw = (data.content || []).map(i => i.text || "").join("");
+    const parsed = extractJSON(raw);
+    if (!parsed) throw new Error(`解析失敗: ${raw.slice(0, 100)}`);
+
+    renderResults(parsed);
+  } catch (e) {
+    document.getElementById("inputSection").classList.remove("hidden");
+    showError(e.message);
+  }
+
+  document.getElementById("loadingBox").classList.add("hidden");
+  document.getElementById("analyzeBtn").disabled = false;
+}
+
+function showError(msg) {
+  const box = document.getElementById("errorBox");
+  box.textContent = "⚠️ " + msg;
+  box.classList.remove("hidden");
+}
+
+function renderResults(data) {
+  const box = document.getElementById("resultsBox");
+  let html = "";
+
+  SECTIONS.forEach(s => {
+    const items = data[s.key] || [];
+    html += `<div class="section">
+      <div class="section-header" style="background:${s.bg};border-bottom:1px solid ${s.border};color:${s.color}">
+        <span>${s.icon}</span><span>${s.label}</span>
+        <span class="badge" style="color:${s.color}">${items.length}件</span>
+      </div>`;
+    if (items.length === 0) {
+      html += `<div class="empty">該当なし</div>`;
+    } else {
+      items.forEach((item, i) => {
+        html += `<div class="item"><span class="item-num">${String(i+1).padStart(2,"0")}</span><span>${escHtml(item)}</span></div>`;
+      });
+    }
+    html += `</div>`;
+  });
+
+  if (data.summary) {
+    html += `<div class="section">
+      <div class="section-header" style="background:#EEF1F4;border-bottom:1px solid #C8D4DC;color:#5A6B7A">
+        <span>📝</span><span>全体まとめ</span>
+      </div>
+      <div class="summary-body">${escHtml(data.summary)}</div>
+    </div>`;
+  }
+
+  html += `<button class="reset-btn" onclick="reset()">🔄 新しいLINEをまとめる</button>`;
+  box.innerHTML = html;
+  box.classList.remove("hidden");
+}
+
+function escHtml(str) {
+  return str.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+}
+
+function reset() {
+  document.getElementById("lineText").value = "";
+  document.getElementById("resultsBox").classList.add("hidden");
+  document.getElementById("inputSection").classList.remove("hidden");
+  document.getElementById("errorBox").classList.add("hidden");
+}
+</script>
+</body>
+</html>
